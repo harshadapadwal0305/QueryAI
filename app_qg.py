@@ -2,6 +2,8 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import pandas as pd
+import os
+import ast
 
 load_dotenv()
 
@@ -343,8 +345,9 @@ def load_dataframe(file):
 # =========================================================
 
 llm = ChatGroq(
-    model='openai/gpt-oss-120b',
-    temperature=0
+    model="openai/gpt-oss-120b",
+    temperature=0,
+    groq_api_key=os.getenv("GROQ_API_KEY")
 )
 
 
@@ -380,70 +383,78 @@ question = st.text_input(
 # =========================================================
 
 if st.button('✦  Get Answer'):
+    if uploaded_file is None:
+        st.warning("Please upload a file first.")
+    elif not question.strip():
+        st.warning("Please enter a question.")
+    else:
+        try:
+            df = load_dataframe(uploaded_file)
+            if df is None:
+                st.error("The uploaded file could not be read.")
+            else:
+                columns = list(df.columns)
 
-    df = load_dataframe(uploaded_file)
+                prompt = '''Role: Act as an experienced Python developer.
+                Task: Write pandas code to find the answer to the question.
+                Question: {}
+                Context: DataFrame name is df and its column names are: {}
+                Constraints: Sample data: {}
+                Output format: Give executable Python code only.
+                Do not provide any other information.
+                Store the final answer in variable final_answer.
+                Do not include import statements.
+                If you don't know the answer, give output None'''.format(
+                    question,
+                    columns,
+                    df.head(2)
+                )
 
-    columns = list(df.columns)
+                response = llm.invoke(prompt)
+                code = response.content.strip()
 
-    prompt = '''Role:Act as an experienced python developer.
-    Task:Write a pandas code to find out answer of question.
-    Question:{}
-    Context:dataframe name is df and its column names are as follows:{}
-    Constraints: sample data:{}
-    Output format: Give executable python code only. Strictly dont provide any other information. Store final answer in variable
-    final_answer, no any import statements. If you dont know answer, give output None'''.format(
-        question,
-        columns,
-        df.head(2)
-    )
+                # GENERATED CODE DISPLAY - original styling preserved
+                st.markdown("""
+                <div class="answer-card">
+                <div class="answer-label">
+                ✦ GENERATED CODE
+                </div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.code(code, language="python")
 
-    response = llm.invoke(prompt)
+                # BASIC CHECKS ONLY - NOT A SECURE SANDBOX
+                ast.parse(code)
+                forbidden = [
+                    "import ", "open(", "eval(", "exec(",
+                    "os.", "subprocess", "__"
+                ]
 
-    code = response.content
+                if any(word in code for word in forbidden):
+                    st.error("Potentially unsafe code detected. Execution blocked.")
+                else:
+                    # Original execution workflow retained; execute only once.
+                    execution_scope = {"df": df, "pd": pd}
+                    exec(code, execution_scope, execution_scope)
 
+                    if "final_answer" not in execution_scope:
+                        st.error("The generated code did not create final_answer.")
+                    else:
+                        st.markdown("""
+                        <div class="answer-card">
+                        <div class="answer-label">
+                        ✦ FINAL ANSWER
+                        </div>
+                        <div class="answer-text">
+                        """, unsafe_allow_html=True)
+                        st.write(execution_scope["final_answer"])
+                        st.markdown("""
+                        </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-    # =====================================================
-    # GENERATED CODE DISPLAY
-    # =====================================================
-
-    st.markdown("""
-<div class="answer-card">
-<div class="answer-label">
-✦ GENERATED CODE
-</div>
-</div>
-""", unsafe_allow_html=True)
-
-    st.code(code, language="python")
-
-
-    # =====================================================
-    # EXECUTE GENERATED CODE
-    # =====================================================
-
-    exec(code)
-
-
-    # =====================================================
-    # FINAL ANSWER DISPLAY
-    # =====================================================
-
-    st.markdown("""
-<div class="answer-card">
-
-<div class="answer-label">
-✦ FINAL ANSWER
-</div>
-
-<div class="answer-text">
-""", unsafe_allow_html=True)
-
-    st.write(final_answer)
-
-    st.markdown("""
-</div>
-</div>
-""", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 
 # =========================================================
