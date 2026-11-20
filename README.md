@@ -87,6 +87,14 @@ The application will open in your default web browser.
 5. **Code Execution:** The application executes the generated code on the uploaded dataset.
 6. **Display Result:** The generated code and final answer are displayed in the Streamlit interface.
 
+## Screenshots
+
+### QueryAI Homepage
+![QueryAI Homepage](queryai-homepage.png)
+
+### QueryAI Generated Code and Output
+![QueryAI Output](queryai-output.png)
+
 ## Application Workflow
 
 ```text
